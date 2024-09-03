@@ -1,10 +1,22 @@
+flare_tempdir/*
+forecasts/*
+data_processed/*
+data_raw/*
+drivers/*
+analysis/*
+automation/*.log
+restart/*
+targets/*
+scores/*
+plots/*
+
+
 # History files
 .Rhistory
 .Rapp.history
 
 # Session Data files
 .RData
-.RDataTmp
 
 # User-specific files
 .Ruserdata
@@ -39,11 +51,5 @@ vignettes/*.pdf
 # R Environment Variables
 .Renviron
 
-# pkgdown site
-docs/
+.DS_Store
 
-# translation temp files
-po/*~
-
-# RStudio Connect folder
-rsconnect/
