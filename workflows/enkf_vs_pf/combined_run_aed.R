@@ -6,7 +6,7 @@ config_set_name <- "enkf_vs_pf"
 site <- "fcre"
 configure_run_file <- "configure_aed_run.yml"
 config_flare_file <- "configure_flare_glm_aed_3groups_manual.yml"
-starting_index <- 1
+starting_index <- 3
 use_s3 <- FALSE
 
 Sys.setenv('GLM_PATH'='GLM3r')
@@ -17,7 +17,7 @@ lake_directory <- here::here()
 
 walk(list.files(file.path(lake_directory, "R"), full.names = TRUE), source)
 
-experiments <- c("enkf", "pf", "no_da")
+experiments <- c("enkf", "pf")
 
 options(future.globals.maxSize = 891289600)
 
@@ -67,8 +67,6 @@ sims$horizon[1:length(models)] <- 0
 
 for(i in starting_index:nrow(sims)){
 
-
-
   message(paste0("index: ", i))
   message(paste0("     Running model: ", sims$model[i], " "))
 
@@ -76,8 +74,12 @@ for(i in starting_index:nrow(sims)){
   sim_names <- paste0(config_set_name, "_" ,model)
 
 
+  config <- FLAREr::set_up_simulation(configure_run_file, lake_directory, config_set_name = config_set_name, sim_name = sim_names, clean_start = TRUE)
+
+
+
   yml <- yaml::read_yaml(file.path(lake_directory, "configuration", config_set_name, configure_run_file))
-  yml$sim_name <- sim_name
+  yml$sim_name <- sim_names
   yaml::write_yaml(yml, file.path(lake_directory, "configuration", config_set_name, configure_run_file))
 
   yml <- yaml::read_yaml(file.path(lake_directory, "configuration", config_set_name, config_flare_file))
@@ -90,7 +92,7 @@ for(i in starting_index:nrow(sims)){
   yaml::write_yaml(yml, file.path(lake_directory, "configuration", config_set_name, config_flare_file))
 
   run_config <- yaml::read_yaml(file.path(lake_directory, "configuration", config_set_name, configure_run_file))
-  run_config$configure_flare <- config_files
+  run_config$configure_flare <- config_flare_file
   run_config$sim_name <- sim_names
   run_config$start_datetime <- as.character(paste0(sims$start_dates[i], " 00:00:00"))
   run_config$forecast_start_datetime <- as.character(paste0(sims$end_dates[i], " 00:00:00"))
@@ -108,9 +110,6 @@ for(i in starting_index:nrow(sims)){
 
   config <- FLAREr::set_up_simulation(configure_run_file, lake_directory, config_set_name = config_set_name, sim_name = sim_names, clean_start = FALSE)
 
-
-
-
   config <- FLAREr:::get_restart_file(config, lake_directory)
 
   file.copy(file.path(config$file_path$configuration_directory,"FCR_SSS_inflow_2013_2021_20220413_allfractions_2DOCpools.csv"),
@@ -121,96 +120,7 @@ for(i in starting_index:nrow(sims)){
   states_config <- readr::read_csv(file.path(config$file_path$configuration_directory, config$model_settings$states_config_file), col_types = readr::cols())
 
   # Inflows
-  hist_interp_inflow <- interpolate_targets(targets = paste0(config$location$site_id,"-targets-inflow.csv"),
-                                            lake_directory = lake_directory,
-                                            targets_dir = 'targets',
-                                            site_id = config$location$site_id,
-                                            #variables = c('FLOW', 'SALT', 'TEMP'),
-                                            variables <- c("time", "FLOW", "TEMP", "SALT",
-                                                           'OXY_oxy',
-                                                           'CAR_dic',
-                                                           'CAR_ch4',
-                                                           'SIL_rsi',
-                                                           'NIT_amm',
-                                                           'NIT_nit',
-                                                           'PHS_frp',
-                                                           'OGM_doc',
-                                                           'OGM_docr',
-                                                           'OGM_poc',
-                                                           'OGM_don',
-                                                           'OGM_donr',
-                                                           'OGM_pon',
-                                                           'OGM_dop',
-                                                           'OGM_dopr',
-                                                           'OGM_pop',
-                                                           'PHY_cyano',
-                                                           'PHY_green',
-                                                           'PHY_diatom'),
-                                            depth = F,
-                                            method = 'linear')
-
-
-  hist_interp_inflow <- hist_interp_inflow |>
-    mutate(flow_number = 1,
-           parameter = 1) |>
-    rename(prediction = observation)
-
-  arrow::write_dataset(hist_interp_inflow, path = file.path(lake_directory, "drivers/inflow/historical/model_id=historical_interp/site_id=fcre"))
-
-
-  # generate a simple "forecast" that has ensemble members
-  forecast_date <- config$run_config$forecast_start_datetime
-  future_inflow <- hist_interp_inflow |>
-    filter(datetime > forecast_date,
-           datetime <= as_date(forecast_date) + config$run_config$forecast_horizon) |>
-    mutate(parameter = 1,
-           flow_number = 1) |>
-    #reframe(prediction = rnorm(10, mean = observation, sd = 1),
-    #        parameter = 1:10,
-    #        .by = c(site_id, datetime, variable)) |>
-    mutate(reference_datetime = as_date(forecast_date))
-
-  arrow::write_dataset(future_inflow,
-                       file.path(lake_directory, "drivers/inflow/future/model_id=historical_interp"),
-                       partitioning = c('reference_datetime', 'site_id'))
-
-
-  #==========================================#
-
-  # outflows
-  hist_interp_outflow <- interpolate_targets(targets = paste0(config$location$site_id,"-targets-inflow.csv"),
-                                             lake_directory = lake_directory,
-                                             targets_dir = 'targets',
-                                             site_id = config$location$site_id,
-                                             #variables = c('FLOW', 'SALT', 'TEMP'),
-                                             variables <- c("time", "FLOW"),
-                                             depth = F,
-                                             method = 'linear')
-
-  hist_interp_outflow <- hist_interp_outflow |>
-    mutate(flow_number = 1,
-           parameter = 1) |>
-    rename(prediction = observation)
-
-  arrow::write_dataset(hist_interp_outflow, path = file.path(lake_directory, "drivers/outflow/historical/model_id=historical_interp/site_id=fcre"))
-
-
-  # generate a simple "forecast" that has ensemble members
-  future_outflow <- hist_interp_outflow |>
-    filter(datetime > forecast_date,
-           datetime <= as_date(forecast_date) + config$run_config$forecast_horizon) |>
-    mutate(parameter = 1,
-           flow_number = 1) |>
-    #reframe(prediction = rnorm(10, mean = observation, sd = 1),
-    #        parameter = 1:10,
-    #        .by = c(site_id, datetime, variable)) |>
-    mutate(reference_datetime = as_date(forecast_date))
-
-
-  arrow::write_dataset(future_outflow,
-                       file.path(lake_directory, "drivers/outflow/future/model_id=historical_interp"),
-                       partitioning = c('reference_datetime', 'site_id'))
-
+  source(file.path(lake_directory, "workflows", config_set_name, "make_flow_drivers.R"))
   met_start_datetime <- lubridate::as_datetime(config$run_config$start_datetime)
   met_forecast_start_datetime <- lubridate::as_datetime(config$run_config$forecast_start_datetime)
 
