@@ -2,8 +2,7 @@ library(tidyverse)
 library(lubridate)
 set.seed(201)
 
-sim_name <- "test"
-config_set_name <- "analysis"
+config_set_name <- "enkf_vs_pf"
 site <- "fcre"
 configure_run_file <- "configure_aed_run.yml"
 config_flare_file <- "configure_flare_glm_aed_3groups_manual.yml"
@@ -18,9 +17,7 @@ lake_directory <- here::here()
 
 walk(list.files(file.path(lake_directory, "R"), full.names = TRUE), source)
 
-
 experiments <- c("enkf", "pf", "no_da")
-
 
 options(future.globals.maxSize = 891289600)
 
@@ -29,7 +26,7 @@ lake_directory <- here::here()
 num_forecasts <- 52
 days_between_forecasts <- 7
 forecast_horizon <- 14
-starting_date <- as_date("2021-08-01")
+starting_date <- as_date("2021-10-01")
 second_date <- as_date("2021-12-25")
 
 
@@ -76,7 +73,7 @@ for(i in starting_index:nrow(sims)){
   message(paste0("     Running model: ", sims$model[i], " "))
 
   model <- sims$model[i]
-  sim_names <- paste0("glmaed_ms_" ,model)
+  sim_names <- paste0(config_set_name, "_" ,model)
 
 
   yml <- yaml::read_yaml(file.path(lake_directory, "configuration", config_set_name, configure_run_file))
