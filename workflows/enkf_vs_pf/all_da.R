@@ -6,7 +6,7 @@ config_set_name <- "enkf_vs_pf"
 site <- "fcre"
 configure_run_file <- "configure_aed_run.yml"
 config_flare_file <- "configure_flare_glm_aed_3groups_manual.yml"
-starting_index <- 40
+starting_index <- 1
 use_s3 <- FALSE
 
 Sys.setenv('GLM_PATH'='GLM3r')
@@ -19,16 +19,12 @@ walk(list.files(file.path(lake_directory, "R"), full.names = TRUE), source)
 
 experiments <- c("enkf", "pf")
 
-options(future.globals.maxSize = 891289600)
-
-lake_directory <- here::here()
-
-num_forecasts <- 52
-days_between_forecasts <- 7
-forecast_horizon <- 14
+num_forecasts <- 52/4
+days_between_forecasts <- 52*7 / num_forecasts
+forecast_horizon <- 0
 starting_date <- as_date("2021-10-01")
 #starting_date <- as_date("2021-12-01")
-second_date <- as_date("2021-12-25")
+second_date <- as_date("2021-12-31")
 
 
 all_dates <- seq.Date(starting_date,second_date + days(days_between_forecasts * num_forecasts), by = 1)
@@ -45,9 +41,11 @@ start_dates <- as_date(rep(NA, num_forecasts + 1))
 end_dates <- as_date(rep(NA, num_forecasts + 1))
 start_dates[1] <- starting_date
 end_dates[1] <- second_date
+if(num_forecasts > 0){
 for(i in 2:(num_forecasts+1)){
   start_dates[i] <- as_date(end_dates[i-1])
   end_dates[i] <- start_dates[i] + days(days_between_forecasts)
+}
 }
 
 sims <- expand.grid(paste0(start_dates,"_",end_dates,"_", forecast_horizon), models)
@@ -66,6 +64,8 @@ sims <- sims |>
 
 sims$horizon[1:length(models)] <- 0
 
+#sims <- sims[1:2, ]
+
 for(i in starting_index:nrow(sims)){
 
   message(paste0("index: ", i))
@@ -74,12 +74,10 @@ for(i in starting_index:nrow(sims)){
   model <- sims$model[i]
   sim_names <- paste0(config_set_name, "_" ,model)
 
-  sim_names <- paste0("restart", "_" ,model)
+  sim_names <- paste0("year_da", "_" ,model)
 
 
   config <- FLAREr::set_up_simulation(configure_run_file, lake_directory, config_set_name = config_set_name, sim_name = sim_names, clean_start = TRUE)
-
-
 
   yml <- yaml::read_yaml(file.path(lake_directory, "configuration", config_set_name, configure_run_file))
   yml$sim_name <- sim_names
