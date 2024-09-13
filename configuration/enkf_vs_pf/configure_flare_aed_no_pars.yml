@@ -58,9 +58,9 @@ model_settings:
   - 7.0
   - 8.0
   - 9.0
-  par_config_file: parameter_calibration_config_aed_3groups.csv
-  obs_config_file: observations_config_aed_manual.csv
-  states_config_file: states_config_aed_3groups_manual.csv
+  par_config_file: parameter_calibration_config_aed_no_pars.csv
+  obs_config_file: observations_config_aed.csv
+  states_config_file: states_config_aed.csv
   depth_model_sd_config_file: depth_model_sd_aed.csv
 default_init:
   lake_depth: 9.4
@@ -104,11 +104,11 @@ flows:
   use_ler_vars: no
   use_flows_s3: no
 met:
-  future_met_model: gefs-v12/stage2
+  future_met_model: future/model_id=obs_interp
   future_met_use_s3: no
   historical_met_use_s3: no
   forecast_lag_days: 0
-  historical_met_model: gefs-v12/stage3
+  historical_met_model: historical/model_id=obs_interp
   local_met_directory: drivers/met
   use_ler_vars: no
   use_openmeteo: no

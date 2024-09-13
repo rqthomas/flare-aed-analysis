@@ -2,26 +2,27 @@ library(tidyverse)
 library(lubridate)
 set.seed(201)
 
+# This need to be set to run each experiment
+
+run_name <- "senors"
+config_flare_file <- "configure_flare_aed.yml"
+starting_index <- 3
+experiments <- c("enkf", "pf")
+
+
+# These don't need to be changed
+
 config_set_name <- "enkf_vs_pf"
 site <- "fcre"
 configure_run_file <- "configure_aed_run.yml"
-config_flare_file <- "configure_flare_glm_aed_3groups_manual.yml"
-starting_index <- 40
 use_s3 <- FALSE
-
 Sys.setenv('GLM_PATH'='GLM3r')
-
-options(future.globals.maxSize = 891289600)
-
 lake_directory <- here::here()
+options(future.globals.maxSize = 891289600)
 
 walk(list.files(file.path(lake_directory, "R"), full.names = TRUE), source)
 
-experiments <- c("enkf", "pf")
-
-options(future.globals.maxSize = 891289600)
-
-lake_directory <- here::here()
+### Set up simulation start and end dates
 
 num_forecasts <- 52
 days_between_forecasts <- 7
@@ -29,7 +30,6 @@ forecast_horizon <- 14
 starting_date <- as_date("2021-10-01")
 #starting_date <- as_date("2021-12-01")
 second_date <- as_date("2021-12-25")
-
 
 all_dates <- seq.Date(starting_date,second_date + days(days_between_forecasts * num_forecasts), by = 1)
 
@@ -72,17 +72,13 @@ for(i in starting_index:nrow(sims)){
   message(paste0("     Running model: ", sims$model[i], " "))
 
   model <- sims$model[i]
-  sim_names <- paste0(config_set_name, "_" ,model)
-
-  sim_names <- paste0("restart", "_" ,model)
-
+  sim_names <- paste0(config_set_name, "_", run_name , "_" ,model)
 
   config <- FLAREr::set_up_simulation(configure_run_file, lake_directory, config_set_name = config_set_name, sim_name = sim_names, clean_start = TRUE)
 
-
-
   yml <- yaml::read_yaml(file.path(lake_directory, "configuration", config_set_name, configure_run_file))
   yml$sim_name <- sim_names
+  yml$configure_flare <- config_flare_file
   yaml::write_yaml(yml, file.path(lake_directory, "configuration", config_set_name, configure_run_file))
 
   yml <- yaml::read_yaml(file.path(lake_directory, "configuration", config_set_name, config_flare_file))
@@ -116,8 +112,7 @@ for(i in starting_index:nrow(sims)){
 
   config <- FLAREr:::get_restart_file(config, lake_directory)
 
-  file.copy(file.path(config$file_path$configuration_directory,"FCR_SSS_inflow_2013_2021_20220413_allfractions_2DOCpools.csv"),
-            file.path(config$file_path$execute_directory,"FCR_SSS_inflow_2013_2021_20220413_allfractions_2DOCpools.csv"))
+  file.copy(file.path(config$file_path$configuration_directory,"SSS_2013_2023.csv"), file.path(config$file_path$execute_directory,"SSS_2013_2023.csv"))
 
   pars_config <- readr::read_csv(file.path(config$file_path$configuration_directory, config$model_settings$par_config_file), col_types = readr::cols())
   obs_config <- readr::read_csv(file.path(config$file_path$configuration_directory, config$model_settings$obs_config_file), col_types = readr::cols())
@@ -134,9 +129,7 @@ for(i in starting_index:nrow(sims)){
   inflow_outflow_files <- FLAREr:::create_inflow_outflow_files(config, config_set_name, lake_directory)
 
 
-  if(config$model_settings$model_name == "glm_aed"){
-    inflow_outflow_files$inflow_file_names <- cbind(inflow_outflow_files$inflow_file_names, rep(file.path(config$file_path$execute_directory,"FCR_SSS_inflow_2013_2021_20220413_allfractions_2DOCpools.csv"), length(inflow_outflow_files$inflow_file_name)))
-  }
+  inflow_outflow_files$inflow_file_names <- cbind(inflow_outflow_files$inflow_file_names, rep(file.path(config$file_path$execute_directory,"SSS_2013_2023.csv"), length(inflow_outflow_files$inflow_file_name)))
 
   #Create observation matrix
   obs <- FLAREr:::create_obs_matrix(cleaned_observations_file_long = file.path(config$file_path$qaqc_data_directory,paste0(config$location$site_id, "-targets-insitu.csv")),
@@ -162,24 +155,24 @@ for(i in starting_index:nrow(sims)){
                                                config,
                                                obs_non_vertical = obs_non_vertical)
 
-  # states_init = init$states
-  # pars_init = init$pars
-  # aux_states_init = init$aux_states_init
-  # obs = obs
-  # obs_sd = obs_config$obs_sd
-  # model_sd = model_sd
-  # working_directory = config$file_path$execute_directory
-  # met_file_names = met_out$filenames
-  # inflow_file_names = inflow_outflow_files$inflow_file_names[,1]
-  # outflow_file_names = inflow_outflow_files$outflow_file_names
-  # config = config
-  # pars_config = pars_config
-  # states_config = states_config
-  # obs_config = obs_config
-  # da_method = config$da_setup$da_method
-  # par_fit_method = config$da_setup$par_fit_method
-  # obs_secchi = obs_non_vertical$obs_secchi
-  # obs_depth = obs_non_vertical$obs_depth
+   states_init = init$states
+   pars_init = init$pars
+   aux_states_init = init$aux_states_init
+   obs = obs
+   obs_sd = obs_config$obs_sd
+   model_sd = model_sd
+   working_directory = config$file_path$execute_directory
+   met_file_names = met_out$filenames
+   inflow_file_names = inflow_outflow_files$inflow_file_names[,1]
+   outflow_file_names = inflow_outflow_files$outflow_file_names
+   config = config
+   pars_config = pars_config
+   states_config = states_config
+   obs_config = obs_config
+   da_method = config$da_setup$da_method
+   par_fit_method = config$da_setup$par_fit_method
+   obs_secchi = obs_non_vertical$obs_secchi
+   obs_depth = obs_non_vertical$obs_depth
 
 
   da_forecast_output <- FLAREr:::run_da_forecast(states_init = init$states,
@@ -190,7 +183,7 @@ for(i in starting_index:nrow(sims)){
                                                  model_sd = model_sd,
                                                  working_directory = config$file_path$execute_directory,
                                                  met_file_names = met_out$filenames,
-                                                 inflow_file_names = inflow_outflow_files$inflow_file_names[,1],
+                                                 inflow_file_names = inflow_outflow_files$inflow_file_names,
                                                  outflow_file_names = inflow_outflow_files$outflow_file_names,
                                                  config = config,
                                                  pars_config = pars_config,

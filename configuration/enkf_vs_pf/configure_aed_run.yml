@@ -3,6 +3,6 @@ start_datetime: 2022-09-28 00:00:00
 end_datetime: .na
 forecast_start_datetime: 2022-10-02 00:00:00
 forecast_horizon: 16
-sim_name: year_da_enkf
-configure_flare: configure_flare_glm_aed_3groups_manual.yml
+sim_name: enkf_vs_pf_senors_pf
+configure_flare: configure_flare_aed.yml
 use_s3: no

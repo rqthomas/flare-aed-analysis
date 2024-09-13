@@ -87,3 +87,32 @@ future_outflow <- hist_interp_outflow |>
 arrow::write_dataset(future_outflow,
                      file.path(lake_directory, "drivers/outflow/future/model_id=historical_interp"),
                      partitioning = c('reference_datetime', 'site_id'))
+
+
+
+
+
+cleaned_met_file <- file.path(lake_directory, "targets", config$location$site_id, paste0("observed-met_", config$location$site_id,".csv"))
+
+#Met
+hist_interp_met <- readr::read_csv(cleaned_met_file, show_col_types = FALSE) |>
+  mutate(parameter = 1) |>
+  rename(prediction = observation) |>
+  filter(datetime >= lubridate::as_datetime(config$run_config$start_datetime),
+         datetime <= lubridate::as_datetime(config$run_config$forecast_start_datetime)) |>
+  arrange(datetime)
+
+arrow::write_dataset(hist_interp_met, path = file.path(lake_directory, "drivers/met/historical/model_id=obs_interp/site_id=fcre"))
+
+hist_interp_met <- readr::read_csv(cleaned_met_file, show_col_types = FALSE) |>
+  mutate(parameter = 1) |>
+  rename(prediction = observation) |>
+  filter(datetime >=  lubridate::as_datetime(config$run_config$forecast_start_datetime),
+         datetime <=  lubridate::as_datetime(config$run_config$forecast_start_datetime) + lubridate::days(config$run_config$forecast_horizon)) |>
+  mutate(reference_datetime = as_date(config$run_config$forecast_start_datetime)) |>
+  arrange(datetime)
+
+arrow::write_dataset(hist_interp_met, path = file.path(lake_directory, "drivers/met/future/model_id=obs_interp"), partitioning = c("reference_datetime","site_id"))
+
+
+
