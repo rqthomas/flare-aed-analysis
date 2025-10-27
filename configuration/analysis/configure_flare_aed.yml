@@ -29,15 +29,18 @@ location:
   latitude: 37.307
   longitude: -79.837
 da_setup:
-  da_method: pf
-  par_fit_method: perturb
-  ensemble_size: 217
-  localization_distance: .na
+  da_method: enkf
+  par_fit_method: inflate
+  ensemble_size: 62
+  localization_distance: 2
   pf_always_resample: no
   no_negative_states: yes
   assimilate_first_step: no
-  use_obs_constraint: yes
-  inflation_factor: 1.0
+  use_obs_constraint: no
+  use_inflation_factor: yes
+  inflation_factor: 1.1
+  inflation_only_at_da: yes
+  add_random_noise: no
 model_settings:
   ncore: 10
   max_model_layers: 75
@@ -58,10 +61,9 @@ model_settings:
   - 7.0
   - 8.0
   - 9.0
-  par_config_file: parameter_calibration_config_aed_3groups.csv
+  par_config_file: parameter_calibration_config_aed.csv
   obs_config_file: observations_config_aed.csv
-  states_config_file: states_config_aed_3groups_manual.csv
-  depth_model_sd_config_file: depth_model_sd_aed.csv
+  states_config_file: states_config_aed.csv
 default_init:
   lake_depth: 9.4
   temp:
@@ -104,11 +106,11 @@ flows:
   use_ler_vars: no
   use_flows_s3: no
 met:
-  future_met_model: gefs-v12/stage2
+  future_met_model: future/model_id=obs_interp
   future_met_use_s3: no
   historical_met_use_s3: no
   forecast_lag_days: 0
-  historical_met_model: gefs-v12/stage3
+  historical_met_model: historical/model_id=obs_interp
   local_met_directory: drivers/met
   use_ler_vars: no
   use_openmeteo: no
@@ -120,4 +122,15 @@ uncertainty:
   parameter: yes
   inflow: yes
 output_settings:
-  diagnostics_names: extc
+  diagnostics_names:
+  - extc
+  - PHY_cyano_fNit
+  - PHY_cyano_fNit
+  - PHY_cyano_fPho
+  - PHY_cyano_fT
+  - PHY_green_fNit
+  - PHY_green_fPho
+  - PHY_green_fT
+  - PHY_diatom_fNit
+  - PHY_diatom_fPho
+  - PHY_diatom_fT

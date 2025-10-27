@@ -30,14 +30,16 @@ location:
   longitude: -79.837
 da_setup:
   da_method: enkf
-  par_fit_method: perturb
-  ensemble_size: 217
-  localization_distance: .na
+  par_fit_method: inflate
+  ensemble_size: 62
+  localization_distance: 2
   pf_always_resample: no
   no_negative_states: yes
   assimilate_first_step: no
   use_obs_constraint: yes
-  inflation_factor: 1.0
+  use_inflation_factor: yes
+  inflation_factor: 1.1
+  inflation_only_at_da: yes
 model_settings:
   ncore: 10
   max_model_layers: 75
@@ -58,10 +60,9 @@ model_settings:
   - 7.0
   - 8.0
   - 9.0
-  par_config_file: parameter_calibration_config_aed_no_pars.csv
-  obs_config_file: observations_config_aed.csv
+  par_config_file: parameter_calibration_config_aed.csv
+  obs_config_file: observations_config_aed_sensors_nuts.csv
   states_config_file: states_config_aed.csv
-  depth_model_sd_config_file: depth_model_sd_aed.csv
 default_init:
   lake_depth: 9.4
   temp:
@@ -120,4 +121,15 @@ uncertainty:
   parameter: yes
   inflow: yes
 output_settings:
-  diagnostics_names: extc
+  diagnostics_names:
+  - extc
+  - PHY_cyano_fNit
+  - PHY_cyano_fNit
+  - PHY_cyano_fPho
+  - PHY_cyano_fT
+  - PHY_green_fNit
+  - PHY_green_fPho
+  - PHY_green_fT
+  - PHY_diatom_fNit
+  - PHY_diatom_fPho
+  - PHY_diatom_fT

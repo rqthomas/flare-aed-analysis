@@ -1,27 +1,24 @@
 library(tidyverse)
 library(lubridate)
-set.seed(201)
+set.seed(200)
 
 # This need to be set to run each experiment
 
-run_name <- "error_sens"
-config_flare_file <- "configure_flare_aed_no_da.yml"
-starting_index <- 1
-experiments <- c("obs0.025_proc_0.0125","obs0.05_proc_0.1","obs0.05_proc_0.025","obs0.1_proc_0.05", "obs0.1_proc_0.05_50","obs0.1_proc_0.05_200","obs0.1_proc_0.05_400")
-
-exp_table <- tibble(name = experiments,
-                    obs_error = c(0.025,0.05, 0.05, 0.1, 0.1, 0.1, 0.1),
-                    process_error = c(0.0125, 0.1, 0.025, 0.05,0.05, 0.05, 0.05),
-                    ensemble_members = c(100,100, 100, 100, 50, 200, 400))
+run_name <- "run1"
+config_flare_file <- "configure_flare_aed.yml"
+starting_index <- 3 #260
+experiments <- c("no_da", "sensors", "nuts")
 
 
 # These don't need to be changed
 
-config_set_name <- "error_analysis"
+config_set_name <- "analysis"
 site <- "fcre"
 configure_run_file <- "configure_aed_run.yml"
 use_s3 <- FALSE
-Sys.setenv('GLM_PATH'='GLM3r')
+#Sys.setenv('GLM_PATH'='GLM3r')
+Sys.setenv('GLM_PATH'='/Users/rqthomas/Downloads/glm-aed/glm-source/binaries/macos/Tahoe_26/glm_latest/glm')
+Sys.setenv('GLM_PATH'='/Users/rqthomas/Documents/research/RoL/AED_Tools_Private/GLM/glm')
 lake_directory <- here::here()
 options(future.globals.maxSize = 891289600)
 
@@ -29,16 +26,24 @@ walk(list.files(file.path(lake_directory, "R"), full.names = TRUE), source)
 
 ### Set up simulation start and end dates
 
-num_forecasts <- 1
-days_between_forecasts <- 1
-forecast_horizon <- 30
-starting_date <- as_date("2021-05-01")
-#starting_date <- as_date("2021-12-01")
-#starting_date <- as_date("2021-12-01")
-second_date <- as_date("2020-12-25")
-second_date <- as_date("2021-06-01")
+num_forecasts <- 104
+days_between_forecasts <- 7
+forecast_horizon <- 14
+starting_date <- as_date("2020-11-08")
+#starting_date <- as_date("2021-05-01")
+second_date <- as_date("2021-01-01") - days(days_between_forecasts)
+#second_date <- as_date("2022-12-31")
+#second_date <- as_date("2021-10-10")
 
-models <- exp_table$name
+all_dates <- seq.Date(starting_date,second_date + days(days_between_forecasts * num_forecasts), by = 1)
+
+potential_date_list <- list(no_da = all_dates,
+                            sensors = all_dates,
+                            nuts = all_dates)
+
+date_list <- potential_date_list[which(names(potential_date_list) %in% experiments)]
+
+models <- names(date_list)
 
 start_dates <- as_date(rep(NA, num_forecasts + 1))
 end_dates <- as_date(rep(NA, num_forecasts + 1))
@@ -78,13 +83,18 @@ for(i in starting_index:nrow(sims)){
   yml <- yaml::read_yaml(file.path(lake_directory, "configuration", config_set_name, configure_run_file))
   yml$sim_name <- sim_names
   yml$configure_flare <- config_flare_file
+
+
   yaml::write_yaml(yml, file.path(lake_directory, "configuration", config_set_name, configure_run_file))
 
-  error <- exp_table |>
-    filter(name == model)
-
   yml <- yaml::read_yaml(file.path(lake_directory, "configuration", config_set_name, config_flare_file))
-  yml$da_setup$ensemble_size <- error$ensemble_members
+
+  if(model == "no_da"){
+    yml$da_setup$use_obs_constraint <- FALSE
+  }else{
+    yml$da_setup$use_obs_constraint <- TRUE
+  }
+
   yaml::write_yaml(yml, file.path(lake_directory, "configuration", config_set_name, config_flare_file))
 
   run_config <- yaml::read_yaml(file.path(lake_directory, "configuration", config_set_name, configure_run_file))
@@ -103,6 +113,8 @@ for(i in starting_index:nrow(sims)){
     }
   }
 
+
+
   yaml::write_yaml(run_config, file = file.path(lake_directory, "restart", site, sim_names, configure_run_file))
 
   config <- FLAREr::set_up_simulation(configure_run_file, lake_directory, config_set_name = config_set_name, sim_name = sim_names, clean_start = FALSE)
@@ -114,37 +126,6 @@ for(i in starting_index:nrow(sims)){
   pars_config <- readr::read_csv(file.path(config$file_path$configuration_directory, config$model_settings$par_config_file), col_types = readr::cols())
   obs_config <- readr::read_csv(file.path(config$file_path$configuration_directory, config$model_settings$obs_config_file), col_types = readr::cols())
   states_config <- readr::read_csv(file.path(config$file_path$configuration_directory, config$model_settings$states_config_file), col_types = readr::cols())
-
-
-  error <- exp_table |>
-    filter(name == model)
-
-  process_error <- error$process_error
-  observation_error <- error$obs_error
-
-  states_config$model_sd <- states_config$initial_conditions * process_error
-
-  for(j in 1:nrow(obs_config)){
-
-    sd <- states_config |>
-      dplyr::filter(state_names == obs_config$state_names_obs[j])
-
-    if(nrow(sd) > 0){
-      obs_config$obs_sd[j] <- sd$initial_conditions * observation_error
-    }else if( obs_config$state_names_obs[j] == "OGM_doc_total"){
-      sd <- states_config |>
-        dplyr::filter(states_to_obs_1 %in% c("OGM_doc_total") | states_to_obs_2 %in% c("OGM_doc_total") |  states_to_obs_3 %in% c("OGM_doc_total")) |>
-        mutate(var = (initial_conditions * observation_error)^2) |>
-        summarise(model_sd = sqrt(sum(var)))
-      obs_config$obs_sd[j] <- sd$model_sd
-    }else if( obs_config$state_names_obs[j] == "PHY_TCHLA"){
-      sd <- states_config |>
-        dplyr::filter(states_to_obs_1 %in% c("PHY_TCHLA") | states_to_obs_2 %in% c("PHY_TCHLA") |  states_to_obs_3 %in% c("PHY_TCHLA")) |>
-        mutate(var = ((initial_conditions * observation_error) * states_to_obs_mapping_1)^2) |>
-        summarise(model_sd = sqrt(sum(var)))
-      obs_config$obs_sd[j] <- sd$model_sd
-    }
-  }
 
   # Inflows
   source(file.path(lake_directory, "workflows", config_set_name, "make_flow_drivers.R"))
@@ -164,6 +145,10 @@ for(i in starting_index:nrow(sims)){
                                     obs_config = obs_config,
                                     config)
 
+  if(model != "nuts"){
+    obs[4:6, 2:dim(obs)[2], ] <- NA
+  }
+
   obs_non_vertical <- FLAREr:::create_obs_non_vertical(cleaned_observations_file_long = file.path(config$file_path$qaqc_data_directory,paste0(config$location$site_id, "-targets-insitu.csv")),
                                                        obs_config,
                                                        start_datetime = config$run_config$start_datetime,
@@ -171,7 +156,6 @@ for(i in starting_index:nrow(sims)){
                                                        forecast_start_datetime = config$run_config$forecast_start_datetime,
                                                        forecast_horizon =  config$run_config$forecast_horizon)
 
-  obs_non_vertical$obs_secchi$secchi_sd <- 1.83 * observation_error
 
   states_config <- FLAREr:::generate_states_to_obs_mapping(states_config, obs_config)
 
@@ -203,6 +187,22 @@ for(i in starting_index:nrow(sims)){
   obs_secchi = obs_non_vertical$obs_secchi
   obs_depth = obs_non_vertical$obs_depth
 
+  #read_csv(inflow_outflow_files$inflow_file_names[,1], show_col_types = FALSE) |>
+  #  mutate(
+  #    PHS_frp = PHS_frp * 1.5,
+  #    NIT_nit =  NIT_nit * 1.5,
+  #    NIT_amm =  NIT_amm * 1.5,
+  #    OGM_dop = OGM_dop * 1.5,
+  #    OGM_dopr = OGM_dopr * 1.5,
+  #    OGM_pop = OGM_pop * 1.5,
+  #    OGM_docr = OGM_docr * 1.5,
+  #    OGM_doc = OGM_doc * 1.5,
+  #    OGM_don = OGM_donr * 1.5,
+  #    OGM_don = OGM_don * 1.5,
+  #    OGM_pon = OGM_pon * 1.5,
+  #  ) |>
+  #  readr::write_csv(file = inflow_outflow_files$inflow_file_names[,1],
+  #                   quote = "none")
 
   da_forecast_output <- FLAREr:::run_da_forecast(states_init = init$states,
                                                  pars_init = init$pars,
@@ -239,6 +239,16 @@ for(i in starting_index:nrow(sims)){
 
   targets_df <- read_csv(file.path(config$file_path$qaqc_data_directory,paste0(config$location$site_id, "-targets-insitu.csv")),show_col_types = FALSE)
 
+
+  targets_df <- obs_config |>
+    rename(variable = target_variable) |>
+    select(variable, obs_sd) |>
+    right_join(targets_df, by = "variable") |>
+    mutate(up95 = observation + 1.96 * obs_sd,
+           low95 = observation - 1.96 * obs_sd,
+           low95 = ifelse(variable != "temperature" & low95 < 0, 0, low95))
+
+
   FLAREr:::plotting_general(forecast_df, targets_df, file_name = paste0(tools::file_path_sans_ext(basename(saved_file)),".pdf") , plots_directory = config$file_path$plots_directory)
 
   generate_forecast_score_arrow(targets_df = targets_df,
@@ -250,3 +260,4 @@ for(i in starting_index:nrow(sims)){
                                 variable_types = c("state","parameter","diagnostic"))
 
 }
+
